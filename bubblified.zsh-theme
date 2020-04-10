@@ -61,6 +61,14 @@ SPACESHIP_TIME_FORMAT="${SPACESHIP_TIME_FORMAT=false}"
 SPACESHIP_TIME_12HR="${SPACESHIP_TIME_12HR=false}"
 SPACESHIP_TIME_COLOR="${SPACESHIP_TIME_COLOR="yellow"}"
 
+SPACESHIP_BATTERY_SHOW="${SPACESHIP_BATTERY_SHOW=always}"
+SPACESHIP_BATTERY_PREFIX="${SPACESHIP_BATTERY_PREFIX=""}"
+SPACESHIP_BATTERY_SUFFIX="${SPACESHIP_BATTERY_SUFFIX="$SPACESHIP_PROMPT_DEFAULT_SUFFIX"}"
+SPACESHIP_BATTERY_SYMBOL_CHARGING="${SPACESHIP_BATTERY_SYMBOL_CHARGING=""}"
+SPACESHIP_BATTERY_SYMBOL_DISCHARGING="${SPACESHIP_BATTERY_SYMBOL_DISCHARGING=""}"
+SPACESHIP_BATTERY_SYMBOL_FULL="${SPACESHIP_BATTERY_SYMBOL_FULL=""}"
+SPACESHIP_BATTERY_THRESHOLD="${SPACESHIP_BATTERY_THRESHOLD=99}"
+
 
 
 # HELPER FUNCTIONS
@@ -110,6 +118,27 @@ background () {
         echo "%{$bg[$1]%}"
     fi
 }
+
+# ------------------------------------------------------------------------------
+# UTILS
+# Utils for common used actions
+# ------------------------------------------------------------------------------
+
+# Check if command exists in $PATH
+# USAGE:
+#   spaceship::exists <command>
+spaceship::exists() {
+  command -v $1 > /dev/null 2>&1
+}
+
+# Check if the current directory is in a Git repository.
+# USAGE:
+#   spaceship::is_git
+spaceship::is_git() {
+  # See https://git.io/fp8Pa for related discussion
+  [[ $(command git rev-parse --is-inside-work-tree 2>/dev/null) == true ]]
+}
+
 
 # PROMPT FUNCTIONS
 git_bubble () {
@@ -178,7 +207,7 @@ dir_bubble () {
   local git_branch=$(git rev-parse --abbrev-ref HEAD 2> /dev/null)
 
   # Threat repo root as a top-level directory or not
-  if [[ $SPACESHIP_DIR_TRUNC_REPO == true ]] && [[ -n $git_branch ]]; then
+  if [[ $SPACESHIP_DIR_TRUNC_REPO == true ]] && spaceship::is_git; then
     local git_root=$(git rev-parse --show-toplevel)
 
     # Check if the parent of the $git_root is "/"
@@ -229,6 +258,75 @@ time_bubble () {
   echo -n "$bubble_left$(foreground $SPACESHIP_TIME_COLOR)$time_str$bubble_right"
 }
 
+# Show section only if either of follow is true
+# - Always show is true
+# - battery percentage is below the given limit (default: 10%)
+# - Battery is fully charged
+# Escape % for display since it's a special character in zsh prompt expansion
+battery_bubble() {
+  [[ $SPACESHIP_BATTERY_SHOW == false ]] && return
+
+  local battery_data battery_percent battery_status battery_color
+
+  if spaceship::exists pmset; then
+    battery_data=$(pmset -g batt | grep "InternalBattery")
+
+    # Return if no internal battery
+    [[ -z "$battery_data" ]] && return
+
+    battery_percent="$( echo $battery_data | grep -oE '[0-9]{1,3}%' )"
+    battery_status="$( echo $battery_data | awk -F '; *' '{ print $2 }' )"
+  elif spaceship::exists acpi; then
+    battery_data=$(acpi -b 2>/dev/null | head -1)
+
+    # Return if no battery
+    [[ -z $battery_data ]] && return
+
+    battery_status_and_percent="$(echo $battery_data |  sed 's/Battery [0-9]*: \(.*\), \([0-9]*\)%.*/\1:\2/')"
+    battery_status_and_percent_array=("${(@s/:/)battery_status_and_percent}")
+    battery_status=$battery_status_and_percent_array[1]:l
+    battery_percent=$battery_status_and_percent_array[2]
+
+	# If battery is 0% charge, battery likely doesn't exist.
+    [[ $battery_percent == "0" ]] && return
+
+  elif spaceship::exists upower; then
+    local battery=$(command upower -e | grep battery | head -1)
+
+    # Return if no battery
+    [[ -z $battery ]] && return
+
+    battery_data=$(upower -i $battery)
+    battery_percent="$( echo "$battery_data" | grep percentage | awk '{print $2}' )"
+    battery_status="$( echo "$battery_data" | grep state | awk '{print $2}' )"
+  else
+    return
+  fi
+
+  # Remove trailing % and symbols for comparison
+  battery_percent="$(echo $battery_percent | tr -d '%[,;]')"
+
+  # Change color based on battery percentage
+  if [[ $battery_percent == 100 || $battery_status =~ "(charged|full)" ]]; then
+    battery_color="green"
+  elif [[ $battery_percent -lt $SPACESHIP_BATTERY_THRESHOLD ]]; then
+    battery_color="red"
+  else
+    battery_color="yellow"
+  fi
+
+  # Battery indicator based on current status of battery
+  if [[ $battery_status == "charging" ]];then
+    battery_symbol="${SPACESHIP_BATTERY_SYMBOL_CHARGING}"
+  elif [[ $battery_status =~ "^[dD]ischarg.*" ]]; then
+    battery_symbol="${SPACESHIP_BATTERY_SYMBOL_DISCHARGING}"
+  else
+    battery_symbol="${SPACESHIP_BATTERY_SYMBOL_FULL}"
+  fi
+
+
+  echo -n "$(bubblify 0 "$battery_percent " $battery_color $bubble_color)$(bubblify 2 " $battery_symbol" $bubble_color $battery_color) "
+}
 
 testing_bubble () {
     # tests color support
@@ -268,6 +366,6 @@ _newline=$'\n'
 _lineup=$'\e[1A'
 _linedown=$'\e[1B'
 
-PROMPT='$(ssh_bubble)$user_machine_bubble$(dir_bubble)$_newline$end_of_prompt%{$reset_color%}'
-RPROMPT='%{$_lineup%}$(git_bubble)$error_code_bubble%{$_linedown%}$(time_bubble)%{$reset_color%}'
+PROMPT='$(ssh_bubble)$user_machine_bubble$(dir_bubble)$_newline$error_code_bubble$end_of_prompt%{$reset_color%}'
+RPROMPT='%{$_lineup%}$(git_bubble)$(time_bubble)$(battery_bubble)%{$_linedown%}%{$reset_color%}'
 
