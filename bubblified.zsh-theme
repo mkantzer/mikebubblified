@@ -203,7 +203,11 @@ git_bubble () {
 
     if [[ -n $git_branch ]]; then
 
-        local git_branch_trimmed=$(echo "$git_branch | cut -f1,2 -d'-'")
+        local git_branch_trimmed=$(echo "$git_branch" | cut -f1,2 -d'-')
+        # If trimmed, add "..."
+        if [ $git_branch != $git_branch_trimmed ]; then
+          git_branch_trimmed="${git_branch_trimmed}..."
+        fi
 
         # branch name with symbol
         local git_info="$git_branch_symbol $git_branch_trimmed"
@@ -439,5 +443,5 @@ _newline=$'\n'
 _lineup=$'\e[1A'
 _linedown=$'\e[1B'
 
-PROMPT='$(ssh_bubble)$user_machine_bubble$(dir_bubble)$_newline$(kubectl_bubble)$error_code_bubble$end_of_prompt%{$reset_color%}'
-RPROMPT='%{$_lineup%}$(git_bubble)$(time_bubble)$(battery_bubble)%{$_linedown%}%{$reset_color%}'
+PROMPT='$(ssh_bubble)$user_machine_bubble$(dir_bubble)$_newline$(git_bubble)$(kubectl_bubble)$error_code_bubble$end_of_prompt%{$reset_color%}'
+RPROMPT='%{$_lineup%}$(time_bubble)$(battery_bubble)%{$_linedown%}%{$reset_color%}'
