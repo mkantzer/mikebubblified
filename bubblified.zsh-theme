@@ -32,11 +32,12 @@ bubble_color='black'
 prompt_symbol_color='blue'
 prompt_symbol_error_color='red'
 
-user_color='yellow'
+user_color='green'
 user_machine_symbol_color='green'
 machine_color='magenta'
 
 filepath_color='blue'
+dir_color='blue'
 
 git_default_color='green'
 git_modified_color='yellow'
@@ -45,6 +46,22 @@ git_icons_color='black'
 
 ssh_symbol_color='black'
 ssh_bubble_color='green'
+
+# Config for bits stollen from Spaceship:
+SPACESHIP_DIR_SHOW="${SPACESHIP_DIR_SHOW=true}"
+SPACESHIP_DIR_PREFIX="${SPACESHIP_DIR_PREFIX="in "}"
+SPACESHIP_DIR_TRUNC="${SPACESHIP_DIR_TRUNC=4}"
+SPACESHIP_DIR_TRUNC_PREFIX="${SPACESHIP_DIR_TRUNC_PREFIX=}"
+SPACESHIP_DIR_TRUNC_REPO="${SPACESHIP_DIR_TRUNC_REPO=true}"
+
+SPACESHIP_TIME_SHOW="${SPACESHIP_TIME_SHOW=false}"
+SPACESHIP_TIME_PREFIX="${SPACESHIP_TIME_PREFIX="at "}"
+SPACESHIP_TIME_SUFFIX="${SPACESHIP_TIME_SUFFIX="$SPACESHIP_PROMPT_DEFAULT_SUFFIX"}"
+SPACESHIP_TIME_FORMAT="${SPACESHIP_TIME_FORMAT=false}"
+SPACESHIP_TIME_12HR="${SPACESHIP_TIME_12HR=false}"
+SPACESHIP_TIME_COLOR="${SPACESHIP_TIME_COLOR="yellow"}"
+
+
 
 # HELPER FUNCTIONS
 bubblify () {
@@ -154,6 +171,65 @@ ssh_bubble () {
     fi
 }
 
+dir_bubble () {
+  [[ $SPACESHIP_DIR_SHOW == false ]] && return
+
+  local 'dir' 'trunc_prefix'
+  local git_branch=$(git rev-parse --abbrev-ref HEAD 2> /dev/null)
+
+  # Threat repo root as a top-level directory or not
+  if [[ $SPACESHIP_DIR_TRUNC_REPO == true ]] && [[ -n $git_branch ]]; then
+    local git_root=$(git rev-parse --show-toplevel)
+
+    # Check if the parent of the $git_root is "/"
+    if [[ $git_root:h == / ]]; then
+      trunc_prefix=/
+    else
+      trunc_prefix=$SPACESHIP_DIR_TRUNC_PREFIX
+    fi
+
+    # `${NAME#PATTERN}` removes a leading prefix PATTERN from NAME.
+    # `$~~` avoids `GLOB_SUBST` so that `$git_root` won't actually be
+    # considered a pattern and matched literally, even if someone turns that on.
+    # `$git_root` has symlinks resolved, so we use `${PWD:A}` which resolves
+    # symlinks in the working directory.
+    # See "Parameter Expansion" under the Zsh manual.
+    dir="$trunc_prefix$git_root:t${${PWD:A}#$~~git_root}"
+  else
+    if [[ SPACESHIP_DIR_TRUNC -gt 0 ]]; then
+      # `%(N~|TRUE-TEXT|FALSE-TEXT)` replaces `TRUE-TEXT` if the current path,
+      # with prefix replacement, has at least N elements relative to the root
+      # directory else `FALSE-TEXT`.
+      # See "Prompt Expansion" under the Zsh manual.
+      trunc_prefix="%($((SPACESHIP_DIR_TRUNC + 1))~|$SPACESHIP_DIR_TRUNC_PREFIX|)"
+    fi
+
+    dir="$trunc_prefix%${SPACESHIP_DIR_TRUNC}~"
+  fi
+
+  if [[ ! -w . ]]; then
+    SPACESHIP_DIR_SUFFIX="%F{$SPACESHIP_DIR_LOCK_COLOR}${SPACESHIP_DIR_LOCK_SYMBOL}%f${SPACESHIP_DIR_SUFFIX}"
+  fi
+
+  echo -n "$bubble_left$(foreground $dir_color)$dir$bubble_right"
+}
+
+time_bubble () {
+  [[ $SPACESHIP_TIME_SHOW == false ]] && return
+
+  local 'time_str'
+
+  if [[ $SPACESHIP_TIME_FORMAT != false ]]; then
+    time_str="${SPACESHIP_TIME_FORMAT}"
+  elif [[ $SPACESHIP_TIME_12HR == true ]]; then
+    time_str="%D{%r}"
+  else
+    time_str="%D{%T}"
+  fi
+  echo -n "$bubble_left$(foreground $SPACESHIP_TIME_COLOR)$time_str$bubble_right"
+}
+
+
 testing_bubble () {
     # tests color support
     echo -n "$(bubblify 0 "Zelda " "black" "088")$(bubblify 1 " Link " "black" "089")$(bubblify 1 " Daruk " "black" "090")$(bubblify 1 " Urbosa " "black" "091")$(bubblify 1 " Mipha " "black" "092")$(bubblify 2 " Revali" "black" "093")$_newline$_newline"
@@ -169,7 +245,8 @@ end_of_prompt_bubble="$bubble_left%(?,$(foreground $prompt_symbol_color)$prompt_
 
 end_of_prompt=" %(?,$(foreground $prompt_symbol_color)$prompt_symbol,$(foreground $prompt_symbol_error_color)$prompt_symbol%{$reset_color%}) "
 
-user_machine_bubble="$bubble_left$(foreground $user_color)$user_symbol$(foreground $user_machine_symbol_color)$user_machine_symbol$(foreground $machine_color)$machine_symbol$bubble_right"
+# user_machine_bubble="$bubble_left$(foreground $user_color)$user_symbol$(foreground $user_machine_symbol_color)$user_machine_symbol$(foreground $machine_color)$machine_symbol$bubble_right"
+user_machine_bubble="$bubble_left$(foreground $user_color)$user_symbol$bubble_right"
 
 filepath_bubble="$bubble_left$(foreground $filepath_color)$filepath_symbol$bubble_right"
 filepath_bubble="$bubble_left$(foreground $filepath_color)$filepath_symbol$bubble_right"
@@ -191,6 +268,6 @@ _newline=$'\n'
 _lineup=$'\e[1A'
 _linedown=$'\e[1B'
 
-PROMPT='$(ssh_bubble)$user_machine_bubble$filepath_bubble$_newline$end_of_prompt%{$reset_color%}'
-RPROMPT='%{$_lineup%}$(git_bubble)$error_code_bubble%{$_linedown%}%{$reset_color%}'
+PROMPT='$(ssh_bubble)$user_machine_bubble$(dir_bubble)$_newline$end_of_prompt%{$reset_color%}'
+RPROMPT='%{$_lineup%}$(git_bubble)$error_code_bubble%{$_linedown%}$(time_bubble)%{$reset_color%}'
 
