@@ -9,7 +9,9 @@
 blub_left=''
 blub_right=''
 
-prompt_symbol='-->'
+# prompt_symbol='|->'
+prompt_symbol='||>'
+
 
 user_symbol='%n'
 user_machine_symbol='@' machine_symbol='%M'
@@ -49,25 +51,24 @@ ssh_bubble_color='green'
 
 # Config for bits stollen from Spaceship:
 SPACESHIP_DIR_SHOW="${SPACESHIP_DIR_SHOW=true}"
-SPACESHIP_DIR_PREFIX="${SPACESHIP_DIR_PREFIX="in "}"
 SPACESHIP_DIR_TRUNC="${SPACESHIP_DIR_TRUNC=4}"
 SPACESHIP_DIR_TRUNC_PREFIX="${SPACESHIP_DIR_TRUNC_PREFIX=}"
 SPACESHIP_DIR_TRUNC_REPO="${SPACESHIP_DIR_TRUNC_REPO=true}"
 
-SPACESHIP_TIME_SHOW="${SPACESHIP_TIME_SHOW=false}"
-SPACESHIP_TIME_PREFIX="${SPACESHIP_TIME_PREFIX="at "}"
-SPACESHIP_TIME_SUFFIX="${SPACESHIP_TIME_SUFFIX="$SPACESHIP_PROMPT_DEFAULT_SUFFIX"}"
+SPACESHIP_TIME_SHOW="${SPACESHIP_TIME_SHOW=true}"
 SPACESHIP_TIME_FORMAT="${SPACESHIP_TIME_FORMAT=false}"
 SPACESHIP_TIME_12HR="${SPACESHIP_TIME_12HR=false}"
 SPACESHIP_TIME_COLOR="${SPACESHIP_TIME_COLOR="yellow"}"
 
 SPACESHIP_BATTERY_SHOW="${SPACESHIP_BATTERY_SHOW=always}"
-SPACESHIP_BATTERY_PREFIX="${SPACESHIP_BATTERY_PREFIX=""}"
-SPACESHIP_BATTERY_SUFFIX="${SPACESHIP_BATTERY_SUFFIX="$SPACESHIP_PROMPT_DEFAULT_SUFFIX"}"
 SPACESHIP_BATTERY_SYMBOL_CHARGING="${SPACESHIP_BATTERY_SYMBOL_CHARGING=""}"
 SPACESHIP_BATTERY_SYMBOL_DISCHARGING="${SPACESHIP_BATTERY_SYMBOL_DISCHARGING=""}"
 SPACESHIP_BATTERY_SYMBOL_FULL="${SPACESHIP_BATTERY_SYMBOL_FULL=""}"
 SPACESHIP_BATTERY_THRESHOLD="${SPACESHIP_BATTERY_THRESHOLD=99}"
+
+SPACESHIP_KUBECTL_SHOW="${SPACESHIP_KUBECTL_SHOW=true}"
+SPACESHIP_KUBECTL_COLOR="${SPACESHIP_KUBECTL_COLOR="magenta"}"
+SPACESHIP_KUBECTL_SYMBOL="${SPACESHIP_KUBECTL_SYMBOL="⎈"}"
 
 
 
@@ -138,6 +139,60 @@ spaceship::is_git() {
   # See https://git.io/fp8Pa for related discussion
   [[ $(command git rev-parse --is-inside-work-tree 2>/dev/null) == true ]]
 }
+
+
+# ------------------------------------------------------------------------------
+# Dependencies
+# ------------------------------------------------------------------------------
+SPACESHIP_KUBECTL_VERSION_SHOW="${SPACESHIP_KUBECTL_VERSION_SHOW=true}"
+SPACESHIP_KUBECTL_VERSION_PREFIX="${SPACESHIP_KUBECTL_VERSION_PREFIX=""}"
+SPACESHIP_KUBECTL_VERSION_SUFFIX="${SPACESHIP_KUBECTL_VERSION_SUFFIX="$SPACESHIP_PROMPT_DEFAULT_SUFFIX"}"
+SPACESHIP_KUBECTL_VERSION_COLOR="${SPACESHIP_KUBECTL_VERSION_COLOR="cyan"}"
+
+# Show current kubectl version
+spaceship_kubectl_version() {
+  [[ $SPACESHIP_KUBECTL_VERSION_SHOW == false ]] && return
+
+  spaceship::exists kubectl || return
+
+  # if kubectl can't connect kubernetes cluster, kubernetes version section will be not shown
+  local kubectl_version=$(kubectl version --short 2>/dev/null | grep "Server Version" | sed 's/Server Version: \(.*\)/\1/')
+  [[ -z $kubectl_version ]] && return
+}
+
+# Show current context in kubectl
+spaceship_kubectl_context() {
+  [[ $SPACESHIP_KUBECONTEXT_SHOW == false ]] && return
+
+  spaceship::exists kubectl || return
+
+  local kube_context=$(kubectl config current-context 2>/dev/null)
+  [[ -z $kube_context ]] && return
+
+  if [[ $SPACESHIP_KUBECONTEXT_NAMESPACE_SHOW == true ]]; then
+    local kube_namespace=$(kubectl config view --minify --output 'jsonpath={..namespace}' 2>/dev/null)
+    [[ -n $kube_namespace && "$kube_namespace" != "default" ]] && kube_context="$kube_context ($kube_namespace)"
+  fi
+
+  # Apply custom color to section if $kube_context matches a pattern defined in SPACESHIP_KUBECONTEXT_COLOR_GROUPS array.
+  # See Options.md for usage example.
+  local len=${#SPACESHIP_KUBECONTEXT_COLOR_GROUPS[@]}
+  local it_to=$((len / 2))
+  local 'section_color' 'i'
+  for ((i = 1; i <= $it_to; i++)); do
+    local idx=$(((i - 1) * 2))
+    local color="${SPACESHIP_KUBECONTEXT_COLOR_GROUPS[$idx + 1]}"
+    local pattern="${SPACESHIP_KUBECONTEXT_COLOR_GROUPS[$idx + 2]}"
+    if [[ "$kube_context" =~ "$pattern" ]]; then
+      section_color=$color
+      break
+    fi
+  done
+
+  [[ -z "$section_color" ]] && section_color=$SPACESHIP_KUBECONTEXT_COLOR
+}
+
+
 
 
 # PROMPT FUNCTIONS
@@ -263,7 +318,7 @@ time_bubble () {
 # - battery percentage is below the given limit (default: 10%)
 # - Battery is fully charged
 # Escape % for display since it's a special character in zsh prompt expansion
-battery_bubble() {
+battery_bubble () {
   [[ $SPACESHIP_BATTERY_SHOW == false ]] && return
 
   local battery_data battery_percent battery_status battery_color
@@ -328,6 +383,22 @@ battery_bubble() {
   echo -n "$(bubblify 0 "$battery_percent " $battery_color $bubble_color)$(bubblify 2 " $battery_symbol" $bubble_color $battery_color) "
 }
 
+
+# Show both kubectl version and kubectl context:
+#   spaceship_kubectl_version
+#   spaceship_kubectl_context
+kubectl_bubble () {
+  [[ $SPACESHIP_KUBECTL_SHOW == false ]] && return
+
+  local kubectl_version="$(spaceship_kubectl_version)" kubectl_context="$(spaceship_kubectl_context)"
+
+  [[ -z $kubectl_version && -z $kubectl_context ]] && return
+
+  echo -n "$(bubblify 0 "$kubectl_context " $SPACESHIP_KUBECTL_COLOR $bubble_color)$(bubblify 2 " $SPACESHIP_KUBECTL_SYMBOL" $bubble_color $SPACESHIP_KUBECTL_COLOR) "
+}
+
+
+
 testing_bubble () {
     # tests color support
     echo -n "$(bubblify 0 "Zelda " "black" "088")$(bubblify 1 " Link " "black" "089")$(bubblify 1 " Daruk " "black" "090")$(bubblify 1 " Urbosa " "black" "091")$(bubblify 1 " Mipha " "black" "092")$(bubblify 2 " Revali" "black" "093")$_newline$_newline"
@@ -366,6 +437,6 @@ _newline=$'\n'
 _lineup=$'\e[1A'
 _linedown=$'\e[1B'
 
-PROMPT='$(ssh_bubble)$user_machine_bubble$(dir_bubble)$_newline$error_code_bubble$end_of_prompt%{$reset_color%}'
+PROMPT='$(ssh_bubble)$user_machine_bubble$(dir_bubble)$_newline$(kubectl_bubble)$error_code_bubble$end_of_prompt%{$reset_color%}'
 RPROMPT='%{$_lineup%}$(git_bubble)$(time_bubble)$(battery_bubble)%{$_linedown%}%{$reset_color%}'
 
