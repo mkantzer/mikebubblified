@@ -202,8 +202,11 @@ git_bubble () {
     local git_branch=$(git rev-parse --abbrev-ref HEAD 2> /dev/null)
 
     if [[ -n $git_branch ]]; then
+
+        local git_branch_trimmed=$(echo "$git_branch | cut -f1,2 -d'-'")
+
         # branch name with symbol
-        local git_info="$git_branch_symbol $git_branch"
+        local git_info="$git_branch_symbol $git_branch_trimmed"
 
         # used for coloring
         local git_status=$(git status 2> /dev/null) 
@@ -259,7 +262,6 @@ dir_bubble () {
   [[ $SPACESHIP_DIR_SHOW == false ]] && return
 
   local 'dir' 'trunc_prefix'
-  local git_branch=$(git rev-parse --abbrev-ref HEAD 2> /dev/null)
 
   # Threat repo root as a top-level directory or not
   if [[ $SPACESHIP_DIR_TRUNC_REPO == true ]] && spaceship::is_git; then
