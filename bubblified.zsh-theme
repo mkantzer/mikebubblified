@@ -437,6 +437,5 @@ _newline=$'\n'
 _lineup=$'\e[1A'
 _linedown=$'\e[1B'
 
-PROMPT='$(ssh_bubble)$user_machine_bubble$(dir_bubble)$_newline$(git_bubble)$(kubectl_bubble)$error_code_bubble$end_of_prompt%{$reset_color%}'
+PROMPT='$(ssh_bubble)$user_machine_bubble$(dir_bubble)$_newline$(kubectl_bubble)$error_code_bubble$end_of_prompt%{$reset_color%}'
 RPROMPT='%{$_lineup%}$(git_bubble)$(time_bubble)$(battery_bubble)%{$_linedown%}%{$reset_color%}'
-
