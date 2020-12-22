@@ -4,7 +4,7 @@
 
 A zsh-theme inspired by [agnoster](https://github.com/agnoster/agnoster-zsh-theme) and [bubblewritten](https://github.com/paracorde/dots/blob/master/bubblewritten.zsh-theme).
 
-**Best used with [ohmyzsh](https://github.com/ohmyzsh/ohmyzsh) and a [nerdfront](https://github.com/ryanoasis/nerd-fonts)**
+**Best used with [ohmyzsh](https://github.com/ohmyzsh/ohmyzsh) and powered by [nerdfonts](https://github.com/ryanoasis/nerd-fonts)**
 
 ## Installation
 
@@ -18,6 +18,7 @@ antigen theme hohmannr/bubblified
 
 
 ### Manual
+
 ***Assuming you are using ohmyzsh***.
 
 Get the sourcefile
@@ -39,17 +40,40 @@ Restart your terminal emulator and enjoy.
 
 ## Features
 
-### 256 Color support
-This theme supports 256 colors, you can use zsh-color-codes (get a list by running `$ spectrum_ls`) or the traditional zsh-color-strings (e.g. `'red'`). Check the **Customization** section for further information.
+### Git support
 
-![256-colors.png](https://raw.githubusercontent.com/hohmannr/bubblified/master/pics/256-colors.png)
+The theme's git parser adds two level of git information. Firstly, it colors all common git states differently. Secondly, it gives detailed change information by displaying a variety of icons.
 
+**State Colors**
+
+- `green` – clean branch
+- `yellow` – unstaged changes
+- `magenta` – all changes are staged
+- `blue` – there are stashed changes for this branch
+- `red` – unmerged changes/merge conflict
+
+**Icons**
+
+- `•` – indexed file modified
+- `` – file added to index
+- `` – indexed file removed
+- `` – indexed file renamed
+- `裸` – untracked file
+- `` – indexed file copied
+
+![git-demo.png](https://raw.githubusercontent.com/hohmannr/bubblified/master/pics/git-demo.png)
 
 ### SSH Support
 
-If you are installing this theme on a ssh-machine, it automatically detects when you connect to this machine and displays a ssh symbol. You canfreely choose this symbol and the bubble color for every ssh-machine that you manage, making them easily differentiable. Check the **Customization** section for further information.
+If you are installing this theme on a ssh-machine, it automatically detects when you connect to this machine and displays a ssh symbol. You can freely choose this symbol and the bubble color for every ssh-machine that you manage, making them easily differentiable. Check the **Customization** section for further information.
 
-![ssh-bubblified.png](https://raw.githubusercontent.com/hohmannr/bubblified/master/pics/ssh-bubblified.png)
+![ssh-demo.png](https://raw.githubusercontent.com/hohmannr/bubblified/master/pics/ssh-demo.png)
+
+### 256 Color support
+
+This theme supports 256 colors, you can use zsh-color-codes (get a list by running the command `spectrum_ls`) or the traditional zsh-color-strings (e.g. `'red'`). Check the **Customization** section for further information.
+
+![256-colors-demo.png](https://raw.githubusercontent.com/hohmannr/bubblified/master/pics/256-colors-demo.png)
 
 ## Customization
 
@@ -68,7 +92,7 @@ Then edit the theme using your favorite editor, mine is neovim.
 ```
 $ nvim $ZSH/custom/themes/bubblified.zsh-theme
 ```
-To load the edited theme, restart your terminal emulator or source your `.zshrc`
+To load the edited theme, restart your terminal emulator or source your `.zshrc`.
 ```
 $ source ~/.zshrc
 ```
@@ -85,7 +109,7 @@ To change colors for the default bubbles, just change their constants under the 
 filepath_color='blue'
 ```
 
-You can also use zsh-color-codes for a wider spectrum of 256 colors (use the command `$ spectrum_ls` for a complete list). When working with color codes, make sure that you set all three digits.
+You can also use zsh-color-codes for a wider spectrum of 256 colors (use the command `spectrum_ls` for a complete list). When working with color codes, make sure that you set all three digits.
 
 ```
 filepath_color='078'
@@ -108,19 +132,21 @@ Declare a variable (e.g. the current time)
 time_bubble="%T"
 ```
     
-Build a bubble by enclosing the variable with `$bubble_left` and `$bubble_right`
+Build a bubble by enclosing the variable with `$bubble_left` and `$bubble_right`.
 
 ```
 time_bubble="$bubble_left%T$bubble_right"
 ```
 
-*OPTIONAL* - If you want a different text color, then add an escape sequence with the color definition
+*OPTIONAL* - If you want a different text color, then add an escape sequence with the color definition or achieve 256 color support by using the in-built foreground function and a zsh-color-string or a zsh-color-code.
 
 ```
 time_bubble="$bubble_left%{$fg[red]%}%T$bubble_right"
+# or
+time_bubble="$bubble_left$(foreground '073')%T$bubble_right"
 ```
 
-Add the variable to the `PROMPT`
+Add the variable to the `PROMPT`.
 
 ```
 PROMPT='...$time_bubble...'
@@ -129,7 +155,7 @@ PROMPT='...$time_bubble...'
 #### Fancy Bubbles
 
 Fancy bubbles are in the style of the default `git_bubble`. They consist of multiple segments for which the text and the background can be colored individually.
-Define a custom function that echos the bubble's content
+Define a custom function that echos the bubble's content.
 
 ```
 foo () {
@@ -137,7 +163,7 @@ foo () {
 }
 ```
 
-Use the provided `bubblify` function to build custom colored bubble segments
+Use the provided `bubblify` function to build custom colored bubble segments.
 
 ```
 foo () {
@@ -145,18 +171,22 @@ foo () {
 }
 ```
 
-*TIP* - `bubblify {0, 1, 2, 3} "foreground-color" "background-color"` where `0` builds a left segment, `1` builds a middle segment, `2` builds a right segment and `3` builds a whole custom colored bubble with only one segment.
+*TIP* - `bubblify {0, 1, 2, 3} "foreground-color" "background-color"` where `0` builds a left segment, `1` builds a middle segment, `2` builds a right segment and `3` builds a whole custom colored bubble with only one segment. "foreground-color" and "background-color" can be used with zsh-color-strings or zsh-color-codes.
 
 *TIP* - Including `%{$reset_color%}` at the end of the echo will make sure that colors are reset to the default ones after your bubble finishes rendering.
 
-Add the function as a subshell call to the `PROMPT`
+Add the function as a subshell call to the `PROMPT`.
 
 ```
 PROMPT='...$(foo)...'
 ```
 
-
 ## Changelog
+
+- version 0.3:
+    - added git functionality
+    - fastified git parser
+
 - version 0.2:
     - added ssh support
     - added 256 color support
@@ -169,3 +199,4 @@ PROMPT='...$(foo)...'
 
 - version 0.1:
     - initial commit
+

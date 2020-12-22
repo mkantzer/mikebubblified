@@ -1,4 +1,3 @@
-# vim filetype declaration for highlighting
 # vim:ft=sh
 
 # Bubble Theme
@@ -14,16 +13,21 @@ prompt_symbol='||>'
 
 
 user_symbol='%n'
-user_machine_symbol='@' machine_symbol='%M'
+user_machine_symbol=' גּ '
+machine_symbol='%M'
 
 filepath_symbol='%~'
 
 git_branch_symbol=''
-git_new_symbol=''
-git_deleted_symbol=''
+git_clean_symbol=''
 git_modified_symbol='•'
+git_added_symbol=''
+git_deleted_symbol=''
 git_renamed_symbol=''
 git_untracked_symbol='裸'
+git_copied_symbol=''
+git_unmerged_symbol='!'
+git_stashed_symbol=''
 
 ssh_symbol='ssh'
 
@@ -41,10 +45,12 @@ machine_color='magenta'
 filepath_color='blue'
 dir_color='blue'
 
-git_default_color='green'
-git_modified_color='yellow'
+git_clean_color='green'
+git_unstaged_color='yellow'
 git_staged_color='magenta' 
-git_icons_color='black'
+git_stashed_color='blue'
+git_unmerged_color='red'
+git_symbols_color='black'
 
 ssh_symbol_color='black'
 ssh_bubble_color='green'
@@ -197,8 +203,7 @@ spaceship_kubectl_context() {
 
 # PROMPT FUNCTIONS
 git_bubble () {
-    # This parses git status in a very very ugly and dirty way to retrieve all necessary information...I am new to this bash scripting...mercy!
-    # NOTE: Feel free to submit a pull request to beautify this code to reduce lagg.
+    # This parses 'git status -s' to retrieve all necessary information...I am new to this zsh scripting...mercy!
     local git_branch=$(git rev-parse --abbrev-ref HEAD 2> /dev/null)
 
     if [[ -n $git_branch ]]; then
@@ -209,49 +214,63 @@ git_bubble () {
           git_branch_trimmed="${git_branch_trimmed}..."
         fi
 
-        # branch name with symbol
+        # branch name with symbol, initialize symbols and git status output
         local git_info="$git_branch_symbol $git_branch_trimmed"
+        local git_info="$git_branch_symbol $git_branch"
+        local git_symbols=""
+        local git_status=$(git status -s 2> /dev/null | awk '{print substr($0,1,2)}') 
 
-        # used for coloring
-        local git_status=$(git status 2> /dev/null) 
+        # used for coloring (and some for icons)
+        local git_unmerged=$(grep -m1 -E -- 'U|DD|AA' <<< $git_status)
+        local git_branch_stashed=$(git stash list | grep $git_branch)
+        local git_unstaged=$(echo -n $git_status | awk '{print substr($0,2,1)}')
 
-        local git_untracked=$(echo "$git_status" | grep -m1 "Untracked files:")
-        local git_unstaged=$(echo "$git_status" | grep -m1 "Changes not staged for commit:") local git_staged=$(echo "$git_status"| grep -m1 "Changes to be committed:")
-        
         # used for icons
-        local git_modified=$(echo "$git_status" | grep -m1 "modified:")
-        local git_renamed=$(echo "$git_status" | grep -m1 "renamed:")
-        local git_new=$(echo "$git_status" | grep -m1 "new file:")
-        local git_deleted=$(echo "$git_status" | grep -m1 "deleted:")
+        local git_not_clean=$git_status
+        local git_modified=$(grep -m1 'M' <<< $git_status)
+        local git_added=$(grep -m1 'A' <<< $git_status)
+        local git_deleted=$(grep -m1 'D' <<< $git_status)
+        local git_untracked=$(grep -m1 '??' <<< $git_status)
+        local git_renamed=$(grep -m1 'R' <<< $git_status)
+        local git_copied=$(grep -m1 'C' <<< $git_status)
 
-        # determining coloring
-        if [[ -n $git_untracked || -n $git_unstaged ]]; then
-            local git_color=$git_modified_color
-        elif [[ -n $git_staged ]]; then
+        # coloring
+        if [[ -n $git_unmerged ]]; then
+            local git_color=$git_unmerged_color   
+            git_symbols="$git_symbols$git_unmerged_symbol"
+        elif [[ -n $git_branch_stashed ]]; then
+            local git_color=$git_stashed_color
+            git_symbols="$git_symbols$git_stashed_symbol"
+        elif [[ -n "${git_unstaged//[$' \t\r\n']}" && -n $git_not_clean ]]; then
+            local git_color=$git_unstaged_color
+        elif [[ -z "${git_unstaged//[$' \t\r\n']}" && -n $git_not_clean ]]; then
             local git_color=$git_staged_color
         else
-            local git_color=$git_default_color
+            local git_color=$git_clean_color
+            git_symbols="$git_symbols$git_clean_symbol"
         fi
 
-        # determining which icons to add 
-        local git_icons=""
+        # icons
         if [[ -n $git_modified ]]; then
-            git_icons="$git_icons$git_modified_symbol"
+            git_symbols="$git_symbols$git_modified_symbol"
         fi
-        if [[ -n $git_renamed ]]; then
-            git_icons="$git_icons$git_renamed_symbol"
-        fi
-        if [[ -n $git_new ]]; then
-            git_icons="$git_icons$git_new_symbol"
+        if [[ -n $git_added ]]; then
+            git_symbols="$git_symbols$git_added_symbol"
         fi
         if [[ -n $git_deleted ]]; then
-            git_icons="$git_icons$git_deleted_symbol"
+            git_symbols="$git_symbols$git_deleted_symbol"
         fi
         if [[ -n $git_untracked ]]; then
-            git_icons="$git_icons$git_untracked_symbol"
+            git_symbols="$git_symbols$git_untracked_symbol"
+        fi
+        if [[ -n $git_renamed ]]; then
+            git_symbols="$git_symbols$git_renamed_symbol"
+        fi
+        if [[ -n $git_copied ]]; then
+            git_symbols="$git_symbols$git_copied_symbol"
         fi
 
-        echo -n "$(bubblify 0 "$git_info " $git_color $bubble_color)$(bubblify 2 " $git_icons" $git_icons_color $git_color) "
+        echo -n "$(bubblify 0 "$git_info " $git_color $bubble_color)$(bubblify 2 " $git_symbols" $git_symbols_color $git_color) "
     fi
 }
 
@@ -423,7 +442,6 @@ end_of_prompt=" %(?,$(foreground $prompt_symbol_color)$prompt_symbol,$(foregroun
 # user_machine_bubble="$bubble_left$(foreground $user_color)$user_symbol$(foreground $user_machine_symbol_color)$user_machine_symbol$(foreground $machine_color)$machine_symbol$bubble_right"
 user_machine_bubble="$bubble_left$(foreground $user_color)$user_symbol$bubble_right"
 
-filepath_bubble="$bubble_left$(foreground $filepath_color)$filepath_symbol$bubble_right"
 filepath_bubble="$bubble_left$(foreground $filepath_color)$filepath_symbol$bubble_right"
 
 error_code_bubble="%(?,,$bubble_left$(foreground $prompt_symbol_error_color)%?$bubble_right)"
